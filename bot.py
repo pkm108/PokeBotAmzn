@@ -88,11 +88,15 @@ def make_embed(result: Dict[str, Any]) -> discord.Embed:
 
 @bot.event
 async def on_ready():
-    await bot.tree.sync()
-    if not monitor_loop.is_running():
-        monitor_loop.start()
+    synced = await bot.tree.sync()
     print(f"Logged in as {bot.user}")
+    print(f"Synced {len(synced)} command(s)")
 
+
+@bot.tree.command(name="ping", description="Test command")
+async def ping(interaction: discord.Interaction):
+    await interaction.response.send_message("Pong!")
+    
 
 @bot.tree.command(name="setchannel", description="Set the Discord channel for restock alerts.")
 @app_commands.describe(channel="The channel that should receive alerts")
