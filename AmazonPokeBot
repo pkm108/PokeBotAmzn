@@ -1,0 +1,68 @@
+import os, json, re, asyncio
+import discord
+from discord.ext import commands, tasks
+
+TOKEN = os.getenv("TOKEN")
+DB = "products.json"
+
+bot = commands.Bot(command_prefix="!", intents=discord.Intents.default())
+
+def load():
+    try:
+        return json.load(open(DB))
+    except:
+        return {}
+
+def save(d):
+    json.dump(d, open(DB, "w"), indent=2)
+
+db = load()
+
+def asin(x):
+    x = x.strip().upper()
+    m = re.search(r"/DP/([A-Z0-9]{10})", x)
+    return m.group(1) if m else (x if len(x) == 10 else None)
+
+async def check_fake(asin):
+    # Replace with real scraper later (Playwright)
+    return {
+        "asin": asin,
+        "in_stock": True,
+        "sold_by_amazon": True,
+        "ships_by_amazon": True
+    }
+
+@bot.event
+async def on_ready():
+    monitor.start()
+    print("Bot online")
+
+@bot.tree.command(name="add")
+async def add(interaction, item: str):
+    a = asin(item)
+    db[a] = {"last": 0}
+    save(db)
+    await interaction.response.send_message(f"Tracking {a}")
+
+@bot.tree.command(name="remove")
+async def remove(interaction, asin_code: str):
+    db.pop(asin_code.upper(), None)
+    save(db)
+    await interaction.response.send_message("Removed")
+
+@bot.tree.command(name="list")
+async def listcmd(interaction):
+    await interaction.response.send_message("\n".join(db.keys()) or "None")
+
+@tasks.loop(seconds=30)
+async def monitor():
+    for g in bot.guilds:
+        for ch in g.text_channels:
+            if ch.permissions_for(g.me).send_messages:
+                for a in list(db.keys()):
+                    r = await check_fake(a)
+                    if r["in_stock"] and r["sold_by_amazon"] and r["ships_by_amazon"]:
+                        await ch.send(f"🚨 RESTOCK: {a}")
+                return
+
+bot.run(TOKEN)
